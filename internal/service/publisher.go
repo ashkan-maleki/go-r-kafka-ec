@@ -1,9 +1,11 @@
 package service
 
 import (
+	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/model"
 	"github.com/segmentio/kafka-go"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"log"
 )
 
 type Publisher struct {
@@ -26,5 +28,15 @@ func NewPublisher() (*Publisher, func()) {
 	//dsn := "host=localhost user= password= dbname=posts sslmode=disable TimeZone=Asia/Tehran"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
-	return &Publisher{}, nil
+	if err != nil {
+		log.Fatalln(err)
+	}
+	p.db = db
+	if err := db.AutoMigrate(&model.Post{}); err != nil {
+		log.Fatalln(err)
+	}
+	return p, func() {
+		p.newPostReader.Close()
+		p.publishedPostWriter.Close()
+	}
 }
