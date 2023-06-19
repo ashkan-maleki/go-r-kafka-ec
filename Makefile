@@ -16,3 +16,4 @@ run:
 git-commit:
 	git add .
 	git commit -m "$(CMSG)"
+	git push
