@@ -15,4 +15,4 @@ run:
 
 git-commit:
 	git add .
-	git commit -m "$(COMMIT_MSG)"
+	git commit -m "$(CMSG)"
