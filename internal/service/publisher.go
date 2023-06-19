@@ -1,6 +1,7 @@
 package service
 
 import (
+	kafka "github.com/segmentio/kafka-go"
 	"gorm.io/gorm"
 )
 
