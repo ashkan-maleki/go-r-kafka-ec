@@ -1,11 +1,19 @@
 package service
 
 import (
+	"context"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
+	"github.com/gosimple/slug"
+	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/contract"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/model"
 	"github.com/segmentio/kafka-go"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"io"
 	"log"
+	"time"
 )
 
 type Publisher struct {
@@ -35,8 +43,52 @@ func NewPublisher() (*Publisher, func()) {
 	if err := db.AutoMigrate(&model.Post{}); err != nil {
 		log.Fatalln(err)
 	}
+
+	// setup kafka
+	dialer := &kafka.Dialer{} // TODO: Fill in the dialer
+	brokers := []string{""}
+	p.newPostReader = kafka.NewReader(kafka.ReaderConfig{
+		Brokers: brokers,
+		Topic:   "app.newPosts",
+		GroupID: "service.publisher",
+		Dialer:  dialer,
+	})
+	//kafka.NewWriter()
+	p.publishedPostWriter = &kafka.Writer{
+		Addr:  kafka.TCP(brokers...),
+		Topic: "app.publishedPosts",
+		Transport: &kafka.Transport{
+			TLS: &tls.Config{},
+		},
+	}
+
 	return p, func() {
 		p.newPostReader.Close()
 		p.publishedPostWriter.Close()
+	}
+}
+
+func (p *Publisher) Run() {
+	for {
+		newPost, err := p.newPostReader.FetchMessage(context.Background())
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			log.Fatalln(err)
+		}
+
+		var post contract.NewPostMessage
+		if err := json.Unmarshal(newPost.Value, &post); err != nil {
+			log.Printf("decoding new post err: %s\n", err.Error())
+			continue
+		}
+
+		postModel := model.Post{
+			UID:     post.UID,
+			Title:   post.Title,
+			Content: post.Content,
+			Slug:    slug.Make(post.Title + "-" + time.Now().Format(time.Stamp)),
+		}
 	}
 }
