@@ -90,5 +90,13 @@ func (p *Publisher) Run() {
 			Content: post.Content,
 			Slug:    slug.Make(post.Title + "-" + time.Now().Format(time.Stamp)),
 		}
+		if err := p.db.Create(&postModel).Error; err != nil {
+			log.Printf("saving new post in database: %s\n", err.Error())
+		}
+		p.newPostReader.CommitMessages(context.Background(), newPost)
+
+		b, _ := json.Marshal(contract.PublishedPostMessage{Post: postModel})
+		p.publishedPostWriter.WriteMessages(context.Background(), kafka.Message{Value: b})
+		log.Printf("the %s post has been saved in the database\n", post.UID)
 	}
 }
