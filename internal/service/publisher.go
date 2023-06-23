@@ -45,6 +45,7 @@ func NewPublisher() (*Publisher, func()) {
 	}
 
 	// setup kafka
+	//dialer := &kafka.Dialer{SASLMechanism: mechanism, TLS: &tls.Config{}}
 	dialer := &kafka.Dialer{} // TODO: Fill in the dialer
 	brokers := []string{""}
 	p.newPostReader = kafka.NewReader(kafka.ReaderConfig{
