@@ -1,8 +1,12 @@
 package web
 
 import (
+	"context"
 	"crypto/tls"
+	"encoding/json"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/config"
+	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/contract"
+	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/model"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 	"github.com/teris-io/shortid"
@@ -45,4 +49,22 @@ func NewAPI() (*API, func()) {
 // NewMessage returns the generated UID and error
 func (a *API) NewMessage(title, content string) (string, error) {
 	uid := shortid.MustGenerate()
+	message := contract.NewPostMessage{
+		UID:     uid,
+		Title:   title,
+		Content: content,
+	}
+	b, _ := json.Marshal(message)
+	return uid, a.newPostWriter.WriteMessages(context.Background(), kafka.Message{Value: b})
+}
+
+func (a *API) GetPost(slug string) (model.Post, error) {
+	var p model.Post
+	tr := a.rdb.Get(context.Background(), "post:"+slug)
+	b, err := tr.Bytes()
+	if err != nil {
+		return model.Post{}, err
+	}
+	json.Unmarshal(b, &p)
+	return p, nil
 }
