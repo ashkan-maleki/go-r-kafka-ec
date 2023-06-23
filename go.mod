@@ -6,6 +6,7 @@ require (
 	github.com/gosimple/slug v1.13.1
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/segmentio/kafka-go v0.4.40
+	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.1
 )
