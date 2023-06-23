@@ -91,6 +91,7 @@ func (p *Publisher) Run() {
 			Content: post.Content,
 			Slug:    slug.Make(post.Title + "-" + time.Now().Format(time.Stamp)),
 		}
+		log.Println(postModel.Slug)
 		if err := p.db.Create(&postModel).Error; err != nil {
 			log.Printf("saving new post in database: %s\n", err.Error())
 		}
