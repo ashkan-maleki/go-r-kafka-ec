@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/gosimple/slug"
+	"github.com/mamalmaleki/go-r-kafka-ec/internal/config"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/contract"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/model"
 	"github.com/segmentio/kafka-go"
@@ -32,9 +33,9 @@ func NewPublisher() (*Publisher, func()) {
 	//}
 
 	// setup database
-	dsn := "postgres://pg:pass@localhost:5432/crud"
+	//dsn := "postgres://pg:pass@localhost:5432/crud"
 	//dsn := "host=localhost user= password= dbname=posts sslmode=disable TimeZone=Asia/Tehran"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(config.PostgresDsn), &gorm.Config{})
 
 	if err != nil {
 		log.Fatalln(err)
