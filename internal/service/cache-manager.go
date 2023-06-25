@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/mamalmaleki/go-r-kafka-ec/internal/config"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/contract"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
@@ -24,7 +25,7 @@ func NewCacheManager() (*CacheManager, func()) {
 	//}
 
 	// setup redis
-	opt, _ := redis.ParseURL("redis://default:PASSWORD@SERVER:PORT")
+	opt, _ := redis.ParseURL(config.RedisUrl)
 	cm.rdb = redis.NewClient(opt)
 
 	// setup kafka
