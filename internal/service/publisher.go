@@ -14,6 +14,8 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"log"
+	"net"
+	"strconv"
 	"time"
 )
 
@@ -27,7 +29,7 @@ func NewPublisher() (*Publisher, func()) {
 
 	p := &Publisher{}
 
-	//mechanism, err := scram.Mechanism(scram.SHA256, "","")
+	//mechanism, err := scram.Mechanism(scram.SHA256, "", "")
 	//if err != nil {
 	//	log.Fatalln(err)
 	//}
@@ -47,18 +49,61 @@ func NewPublisher() (*Publisher, func()) {
 
 	// setup kafka
 	//dialer := &kafka.Dialer{SASLMechanism: mechanism, TLS: &tls.Config{}}
-	dialer := &kafka.Dialer{} // TODO: Fill in the dialer
-	brokers := []string{""}
+	//dialer := &kafka.Dialer{
+	//	TLS: &tls.Config{InsecureSkipVerify: true},
+	//} // TODO: Fill in the dialer
+	brokers := []string{config.KafkaBrokerAddress}
+
+	// to create topics when auto.create.topics.enable='false'
+	topic1 := "app.newPosts"
+	topic2 := "app.publishedPosts"
+
+	conn, err := kafka.Dial("tcp", config.KafkaBrokerAddress)
+	if err != nil {
+		log.Printf("hi")
+		panic(err.Error())
+	}
+	defer conn.Close()
+
+	controller, err := conn.Controller()
+	if err != nil {
+		panic(err.Error())
+	}
+	var controllerConn *kafka.Conn
+	controllerConn, err = kafka.Dial("tcp", net.JoinHostPort(controller.Host,
+		strconv.Itoa(controller.Port)))
+	if err != nil {
+		panic(err.Error())
+	}
+	defer controllerConn.Close()
+
+	topicConfigs := []kafka.TopicConfig{
+		{
+			Topic:             topic1,
+			NumPartitions:     1,
+			ReplicationFactor: 1,
+		}, {
+			Topic:             topic2,
+			NumPartitions:     1,
+			ReplicationFactor: 1,
+		},
+	}
+
+	err = controllerConn.CreateTopics(topicConfigs...)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	p.newPostReader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers: brokers,
-		Topic:   "app.newPosts",
+		Topic:   topic1,
 		GroupID: "service.publisher",
-		Dialer:  dialer,
+		//Dialer:  dialer,
 	})
 	//kafka.NewWriter()
 	p.publishedPostWriter = &kafka.Writer{
 		Addr:  kafka.TCP(brokers...),
-		Topic: "app.publishedPosts",
+		Topic: topic2,
 		Transport: &kafka.Transport{
 			TLS: &tls.Config{},
 		},

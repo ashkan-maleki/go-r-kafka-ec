@@ -29,13 +29,17 @@ func NewCacheManager() (*CacheManager, func()) {
 	cm.rdb = redis.NewClient(opt)
 
 	// setup kafka
-	// dialer := &kafka.Dialer{SASLMechanism: mechanism, TLS: &tls.Config{}}
-	dialer := &kafka.Dialer{} // TODO: Fill in the dialer
+	//dialer := &kafka.Dialer{SASLMechanism: mechanism, TLS: &tls.Config{}}
+	//dialer := &kafka.Dialer{
+	//	//Timeout:   10 * time.Second,
+	//	//DualStack: true,
+	//	TLS: &tls.Config{InsecureSkipVerify: true},
+	//} // TODO: Fill in the dialer
 	cm.publishedPostReader = kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{""},
+		Brokers: []string{config.KafkaBrokerAddress},
 		Topic:   "app.publishedPosts",
 		GroupID: "service.cacheManager",
-		Dialer:  dialer,
+		//Dialer:  dialer,
 	})
 
 	return cm, func() {
