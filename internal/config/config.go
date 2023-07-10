@@ -1,9 +1,11 @@
 package config
 
 const (
-	RedisUrl           = "redis://default@localhost:6379"
-	PostgresDsn        = "postgres://postgres:postgres@localhost:5432/posts"
-	KafkaBrokerAddress = "localhost:9092"
+	RedisUrl                 = "redis://default@localhost:6379"
+	PostgresDsn              = "postgres://postgres:postgres@localhost:5432/posts"
+	KafkaBrokerAddress       = "localhost:9092"
+	KafkaTopicNewPosts       = "app.newPosts"
+	KafkaTopicPublishedPosts = "app.publishedPosts"
 )
 
 //redisClient := redis.NewClient(&redis.Options{

@@ -8,7 +8,7 @@ tidy:
 run:
 	go run cmd/main.go
 
-up: compose-up run
+up: compose-up tidy run
 
 
 #===============================

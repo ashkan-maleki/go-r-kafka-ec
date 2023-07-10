@@ -5,6 +5,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"io"
+	"log"
+	"time"
+
 	"github.com/gosimple/slug"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/config"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/contract"
@@ -12,11 +16,6 @@ import (
 	"github.com/segmentio/kafka-go"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"io"
-	"log"
-	"net"
-	"strconv"
-	"time"
 )
 
 type Publisher struct {
@@ -58,56 +57,47 @@ func NewPublisher() (*Publisher, func()) {
 	topic1 := "app.newPosts"
 	topic2 := "app.publishedPosts"
 
-	conn, err := kafka.Dial("tcp", config.KafkaBrokerAddress)
-	if err != nil {
-		log.Printf("hi")
-		panic(err.Error())
-	}
-	defer conn.Close()
-
-	controller, err := conn.Controller()
-	if err != nil {
-		panic(err.Error())
-	}
-	var controllerConn *kafka.Conn
-	controllerConn, err = kafka.Dial("tcp", net.JoinHostPort(controller.Host,
-		strconv.Itoa(controller.Port)))
-	if err != nil {
-		panic(err.Error())
-	}
-	defer controllerConn.Close()
-
-	topicConfigs := []kafka.TopicConfig{
-		{
-			Topic:             topic1,
-			NumPartitions:     1,
-			ReplicationFactor: 1,
-		}, {
-			Topic:             topic2,
-			NumPartitions:     1,
-			ReplicationFactor: 1,
-		},
-	}
-
-	err = controllerConn.CreateTopics(topicConfigs...)
-	if err != nil {
-		panic(err.Error())
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true, // Set this to false in production with valid certificates
 	}
 
 	p.newPostReader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers: brokers,
 		Topic:   topic1,
 		GroupID: "service.publisher",
-		//Dialer:  dialer,
-	})
-	//kafka.NewWriter()
-	p.publishedPostWriter = &kafka.Writer{
-		Addr:  kafka.TCP(brokers...),
-		Topic: topic2,
-		Transport: &kafka.Transport{
-			TLS: &tls.Config{},
+		// Partition: 0,
+		// MinBytes:  10e3,
+		// MaxBytes:  10e6,
+		Dialer: &kafka.Dialer{
+			TLS: tlsConfig,
 		},
-	}
+	})
+	// fmt.Println("pass reader")
+	//kafka.NewWriter()
+	// p.publishedPostWriter = &kafka.Writer{
+	// 	Addr:  kafka.TCP(brokers...),
+	// 	Topic: topic2,
+	// 	Transport: &kafka.Transport{
+	// 		TLS: &tls.Config{},
+	// 	},
+	// }
+	// p.publishedPostWriter = &kafka.Writer{
+	// 	Addr:      kafka.TCP(config.KafkaBrokerAddress),
+	// 	Topic:     topic2,
+	// 	Balancer:  &kafka.LeastBytes{},
+	// 	BatchSize: 10,
+	// 	// Dialer: &kafka.Dialer{
+	// 	// 	TLS: tlsConfig,
+	// 	// },
+	// }
+
+	p.publishedPostWriter = kafka.NewWriter(kafka.WriterConfig{
+		Brokers: brokers, // Replace with your Kafka broker address
+		Topic:   topic2,  // Replace with your Kafka topic
+		Dialer: &kafka.Dialer{
+			TLS: tlsConfig,
+		},
+	})
 
 	return p, func() {
 		p.newPostReader.Close()
