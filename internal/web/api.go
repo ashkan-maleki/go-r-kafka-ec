@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"log"
 
@@ -67,16 +66,16 @@ func NewAPI2() (*API, func()) {
 	//dialer := &kafka.Dialer{SASLMechanism: mechanism, TLS: &tls.Config{}}
 	//dialer := &kafka.Dialer{} // TODO: Fill in the dialer
 
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true, // Set this to false in production with valid certificates
-	}
+	// tlsConfig := &tls.Config{
+	// 	InsecureSkipVerify: true, // Set this to false in production with valid certificates
+	// }
 
 	p.newPostWriter = &kafka.Writer{
 		Addr:  kafka.TCP(config.KafkaBrokerAddress),
-		Topic: "app.publishedPosts",
-		Transport: &kafka.Transport{
-			TLS: tlsConfig,
-		},
+		Topic: config.KafkaTopicNewPosts,
+		// Transport: &kafka.Transport{
+		// 	TLS: tlsConfig,
+		// },
 	}
 
 	return p, func() {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 
+	// _ "github.com/gofiber/fiber/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/service"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/web"
@@ -11,29 +12,27 @@ import (
 )
 
 func main() {
-	cm, closeCacheManager := service.NewCacheManager()
+	service.KafkaSetup()
+	cm, closeCacheManager := service.NewCacheManager2()
 	defer closeCacheManager()
-	p, closePublisher := service.NewPublisher()
+	p, closePublisher := service.NewPublisher2()
 	defer closePublisher()
-	api, closeAPI := web.NewAPI()
+	api, closeAPI := web.NewAPI2()
 	defer closeAPI()
 
 	// run background services
-	go cm.Run()
-	go p.Run()
+	go cm.Run2()
+	go p.Run2()
 
 	// setup HTTP server
 	e := echo.New()
 	e.POST("/post", func(c echo.Context) error {
-		log.Println("api begins")
 		title := c.Request().PostFormValue("title")
 		content := c.Request().PostFormValue("content")
-		_, err := api.NewMessage(title, content)
+		_, err := api.NewMessage2(title, content)
 		if err != nil {
-			log.Println("api 500")
 			return c.String(500, err.Error())
 		}
-		log.Println("api ends")
 		return c.String(201, "We have received your post and it will be published sooner or later.")
 	})
 

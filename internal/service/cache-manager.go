@@ -66,7 +66,7 @@ func NewCacheManager2() (*CacheManager, func()) {
 	//} // TODO: Fill in the dialer
 	cm.publishedPostReader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{config.KafkaBrokerAddress},
-		Topic:   "app.publishedPosts",
+		Topic:   config.KafkaTopicPublishedPosts,
 		GroupID: "service.cacheManager",
 		//Dialer:  dialer,
 	})

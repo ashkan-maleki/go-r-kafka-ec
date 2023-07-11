@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"time"
@@ -24,8 +24,31 @@ type Publisher struct {
 	publishedPostWriter *kafka.Writer
 
 	newPostConsumer       sarama.Consumer
+	newPostClient         sarama.ConsumerGroupSession
 	publishedPostProducer sarama.SyncProducer
 	db                    *gorm.DB
+}
+
+func KafkaSetup() {
+	conn, err := kafka.Dial("tcp", "localhost:9092")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer conn.Close()
+
+	partitions, err := conn.ReadPartitions()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	m := map[string]struct{}{}
+
+	for _, p := range partitions {
+		m[p.Topic] = struct{}{}
+	}
+	for k := range m {
+		fmt.Println(k)
+	}
 }
 
 func NewPublisher() (*Publisher, func()) {
@@ -55,7 +78,6 @@ func NewPublisher() (*Publisher, func()) {
 
 	configSarama := sarama.NewConfig()
 	configSarama.Consumer.Return.Errors = true
-	configSarama.Consumer.Offsets.Initial = sarama.OffsetOldest
 	consumer, err := sarama.NewConsumer(brokers, configSarama)
 	if err != nil {
 		panic(err.Error())
@@ -106,23 +128,23 @@ func NewPublisher2() (*Publisher, func()) {
 	brokers := []string{config.KafkaBrokerAddress}
 
 	// to create topics when auto.create.topics.enable='false'
-	topic1 := "app.newPosts"
-	topic2 := "app.publishedPosts"
+	// topic1 := "app.newPosts"
+	// topic2 := "app.publishedPosts"
 
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true, // Set this to false in production with valid certificates
-	}
+	// tlsConfig := &tls.Config{
+	// 	InsecureSkipVerify: true, // Set this to false in production with valid certificates
+	// }
 
 	p.newPostReader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers: brokers,
-		Topic:   topic1,
+		Topic:   config.KafkaTopicNewPosts,
 		GroupID: "service.publisher",
 		// Partition: 0,
 		// MinBytes:  10e3,
 		// MaxBytes:  10e6,
-		Dialer: &kafka.Dialer{
-			TLS: tlsConfig,
-		},
+		// Dialer: &kafka.Dialer{
+		// 	TLS: tlsConfig,
+		// },
 	})
 	// fmt.Println("pass reader")
 	//kafka.NewWriter()
@@ -133,23 +155,21 @@ func NewPublisher2() (*Publisher, func()) {
 	// 		TLS: &tls.Config{},
 	// 	},
 	// }
-	// p.publishedPostWriter = &kafka.Writer{
-	// 	Addr:      kafka.TCP(config.KafkaBrokerAddress),
-	// 	Topic:     topic2,
-	// 	Balancer:  &kafka.LeastBytes{},
-	// 	BatchSize: 10,
-	// 	// Dialer: &kafka.Dialer{
-	// 	// 	TLS: tlsConfig,
-	// 	// },
-	// }
+	p.publishedPostWriter = &kafka.Writer{
+		Addr:  kafka.TCP(config.KafkaBrokerAddress),
+		Topic: config.KafkaTopicPublishedPosts,
+		// Transport: &kafka.Transport{
+		// 	TLS: tlsConfig,
+		// },
+	}
 
-	p.publishedPostWriter = kafka.NewWriter(kafka.WriterConfig{
-		Brokers: brokers, // Replace with your Kafka broker address
-		Topic:   topic2,  // Replace with your Kafka topic
-		Dialer: &kafka.Dialer{
-			TLS: tlsConfig,
-		},
-	})
+	// p.publishedPostWriter = kafka.NewWriter(kafka.WriterConfig{
+	// 	Brokers: brokers, // Replace with your Kafka broker address
+	// 	Topic:   topic2,  // Replace with your Kafka topic
+	// 	Dialer: &kafka.Dialer{
+	// 		TLS: tlsConfig,
+	// 	},
+	// })
 
 	return p, func() {
 		p.newPostReader.Close()
@@ -158,8 +178,8 @@ func NewPublisher2() (*Publisher, func()) {
 }
 
 func (p *Publisher) Run() {
-
 	partitionConsumer, err := p.newPostConsumer.ConsumePartition(config.KafkaTopicNewPosts, 0, sarama.OffsetOldest)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -200,10 +220,6 @@ func (p *Publisher) Run() {
 		// partition, offset, err := a.newPostProducer.SendMessage(msg)
 		_, _, err = p.publishedPostProducer.SendMessage(msg)
 		log.Printf("the %s post has been saved in the database\n", post.UID)
-		sarama.ConsumerGroupSession.MarkMessage(nil, newPost, "")
-	}
-
-	for {
 
 	}
 }
