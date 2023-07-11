@@ -92,15 +92,15 @@ func (a *API) NewMessage(title, content string) (string, error) {
 		log.Println("api new message ends")
 	}()
 	uid := shortid.MustGenerate()
-	log.Println(uid)
 	message := contract.NewPostMessage{
 		UID:     uid,
 		Title:   title,
 		Content: content,
 	}
+	log.Println(message)
 	b, _ := json.Marshal(message)
 	msg := &sarama.ProducerMessage{
-		Topic: config.KafkaTopicPublishedPosts,
+		Topic: config.KafkaTopicNewPosts,
 		Value: sarama.ByteEncoder(b),
 	}
 
