@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/Shopify/sarama"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/config"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/contract"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/domain/model"
@@ -15,42 +14,11 @@ import (
 )
 
 type API struct {
-	rdb             *redis.Client
-	newPostWriter   *kafka.Writer
-	newPostProducer sarama.SyncProducer
+	rdb           *redis.Client
+	newPostWriter *kafka.Writer
 }
 
 func NewAPI() (*API, func()) {
-	p := &API{}
-
-	// setup redis
-	opt, _ := redis.ParseURL(config.RedisUrl)
-	p.rdb = redis.NewClient(opt)
-
-	// setup kafka
-	//dialer := &kafka.Dialer{SASLMechanism: mechanism, TLS: &tls.Config{}}
-	//dialer := &kafka.Dialer{} // TODO: Fill in the dialer
-
-	configSarama := sarama.NewConfig()
-	// configSarama.Net.TLS.Enable = true
-	// configSarama.Net.TLS.Config = &tls.Config{
-	// 	InsecureSkipVerify: true, // Set this to false if you have a valid CA certificate
-	// }
-	configSarama.Producer.Return.Successes = true
-
-	producer, err := sarama.NewSyncProducer([]string{config.KafkaBrokerAddress}, configSarama)
-	if err != nil {
-		log.Fatalf("Failed to create producer: %v", err)
-	}
-	p.newPostProducer = producer
-
-	return p, func() {
-		p.newPostProducer.Close()
-		p.rdb.Close()
-	}
-}
-
-func NewAPI2() (*API, func()) {
 	p := &API{}
 
 	//mechanism, err := scram.Mechanism(scram.SHA256, "","")
@@ -86,34 +54,6 @@ func NewAPI2() (*API, func()) {
 
 // NewMessage returns the generated UID and error
 func (a *API) NewMessage(title, content string) (string, error) {
-	log.Println("api new message begins")
-	defer func() {
-		log.Println("api new message ends")
-	}()
-	uid := shortid.MustGenerate()
-	message := contract.NewPostMessage{
-		UID:     uid,
-		Title:   title,
-		Content: content,
-	}
-	log.Println(message)
-	b, _ := json.Marshal(message)
-	msg := &sarama.ProducerMessage{
-		Topic: config.KafkaTopicNewPosts,
-		Value: sarama.ByteEncoder(b),
-	}
-
-	// partition, offset, err := a.newPostProducer.SendMessage(msg)
-	_, _, err := a.newPostProducer.SendMessage(msg)
-	if err != nil {
-		return uid, err
-	}
-
-	return uid, nil
-}
-
-// NewMessage returns the generated UID and error
-func (a *API) NewMessage2(title, content string) (string, error) {
 	log.Println("api new message begins")
 	defer func() {
 		log.Println("api new message ends")

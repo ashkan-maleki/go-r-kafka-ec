@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"time"
@@ -29,76 +28,29 @@ type Publisher struct {
 	db                    *gorm.DB
 }
 
-func KafkaSetup() {
-	conn, err := kafka.Dial("tcp", "localhost:9092")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer conn.Close()
+// func KafkaSetup() {
+// 	conn, err := kafka.Dial("tcp", "localhost:9092")
+// 	if err != nil {
+// 		panic(err.Error())
+// 	}
+// 	defer conn.Close()
 
-	partitions, err := conn.ReadPartitions()
-	if err != nil {
-		panic(err.Error())
-	}
+// 	partitions, err := conn.ReadPartitions()
+// 	if err != nil {
+// 		panic(err.Error())
+// 	}
 
-	m := map[string]struct{}{}
+// 	m := map[string]struct{}{}
 
-	for _, p := range partitions {
-		m[p.Topic] = struct{}{}
-	}
-	for k := range m {
-		fmt.Println(k)
-	}
-}
+// 	for _, p := range partitions {
+// 		m[p.Topic] = struct{}{}
+// 	}
+// 	for k := range m {
+// 		fmt.Println(k)
+// 	}
+// }
 
 func NewPublisher() (*Publisher, func()) {
-
-	p := &Publisher{}
-
-	// setup database
-	//dsn := "postgres://pg:pass@localhost:5432/crud"
-	//dsn := "host=localhost user= password= dbname=posts sslmode=disable TimeZone=Asia/Tehran"
-	db, err := gorm.Open(postgres.Open(config.PostgresDsn), &gorm.Config{})
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-	p.db = db
-	if err := db.AutoMigrate(&model.Post{}); err != nil {
-		log.Fatalln(err)
-	}
-
-	// setup kafka
-
-	brokers := []string{config.KafkaBrokerAddress}
-
-	// to create topics when auto.create.topics.enable='false'
-	// topic1 := "app.newPosts"
-	// topic2 := "app.publishedPosts"
-
-	configSarama := sarama.NewConfig()
-	configSarama.Consumer.Return.Errors = true
-	consumer, err := sarama.NewConsumer(brokers, configSarama)
-	if err != nil {
-		panic(err.Error())
-	}
-	p.newPostConsumer = consumer
-
-	configSarama = sarama.NewConfig()
-	configSarama.Producer.Return.Successes = true
-	producer, err := sarama.NewSyncProducer(brokers, configSarama)
-	if err != nil {
-		log.Fatalf("Failed to create producer: %v", err)
-	}
-	p.publishedPostProducer = producer
-
-	return p, func() {
-		p.newPostConsumer.Close()
-		p.publishedPostProducer.Close()
-	}
-}
-
-func NewPublisher2() (*Publisher, func()) {
 
 	p := &Publisher{}
 
@@ -127,49 +79,16 @@ func NewPublisher2() (*Publisher, func()) {
 	//} // TODO: Fill in the dialer
 	brokers := []string{config.KafkaBrokerAddress}
 
-	// to create topics when auto.create.topics.enable='false'
-	// topic1 := "app.newPosts"
-	// topic2 := "app.publishedPosts"
-
-	// tlsConfig := &tls.Config{
-	// 	InsecureSkipVerify: true, // Set this to false in production with valid certificates
-	// }
-
 	p.newPostReader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers: brokers,
 		Topic:   config.KafkaTopicNewPosts,
 		GroupID: "service.publisher",
-		// Partition: 0,
-		// MinBytes:  10e3,
-		// MaxBytes:  10e6,
-		// Dialer: &kafka.Dialer{
-		// 	TLS: tlsConfig,
-		// },
 	})
-	// fmt.Println("pass reader")
-	//kafka.NewWriter()
-	// p.publishedPostWriter = &kafka.Writer{
-	// 	Addr:  kafka.TCP(brokers...),
-	// 	Topic: topic2,
-	// 	Transport: &kafka.Transport{
-	// 		TLS: &tls.Config{},
-	// 	},
-	// }
+
 	p.publishedPostWriter = &kafka.Writer{
 		Addr:  kafka.TCP(config.KafkaBrokerAddress),
 		Topic: config.KafkaTopicPublishedPosts,
-		// Transport: &kafka.Transport{
-		// 	TLS: tlsConfig,
-		// },
 	}
-
-	// p.publishedPostWriter = kafka.NewWriter(kafka.WriterConfig{
-	// 	Brokers: brokers, // Replace with your Kafka broker address
-	// 	Topic:   topic2,  // Replace with your Kafka topic
-	// 	Dialer: &kafka.Dialer{
-	// 		TLS: tlsConfig,
-	// 	},
-	// })
 
 	return p, func() {
 		p.newPostReader.Close()
@@ -178,53 +97,6 @@ func NewPublisher2() (*Publisher, func()) {
 }
 
 func (p *Publisher) Run() {
-	partitionConsumer, err := p.newPostConsumer.ConsumePartition(config.KafkaTopicNewPosts, 0, sarama.OffsetOldest)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		if err := partitionConsumer.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	for newPost := range partitionConsumer.Messages() {
-		//fmt.Printf("Consumed message from topic %s partition %d at offset %d: %s\n", message.Topic, message.Partition, message.Offset, string(message.Value))
-
-		var post contract.NewPostMessage
-		if err := json.Unmarshal(newPost.Value, &post); err != nil {
-			log.Printf("decoding new post err: %s\n", err.Error())
-			continue
-		}
-
-		postModel := model.Post{
-			UID:     post.UID,
-			Title:   post.Title,
-			Content: post.Content,
-			Slug:    slug.Make(post.Title + "-" + time.Now().Format(time.Stamp)),
-		}
-		log.Println(postModel)
-
-		if err := p.db.Create(&postModel).Error; err != nil {
-			log.Printf("saving new post in database: %s\n", err.Error())
-		}
-
-		b, _ := json.Marshal(contract.PublishedPostMessage{Post: postModel})
-
-		msg := &sarama.ProducerMessage{
-			Topic: config.KafkaTopicPublishedPosts,
-			Value: sarama.ByteEncoder(b),
-		}
-
-		// partition, offset, err := a.newPostProducer.SendMessage(msg)
-		_, _, err = p.publishedPostProducer.SendMessage(msg)
-		log.Printf("the %s post has been saved in the database\n", post.UID)
-
-	}
-}
-
-func (p *Publisher) Run2() {
 
 	for {
 		newPost, err := p.newPostReader.FetchMessage(context.Background())
