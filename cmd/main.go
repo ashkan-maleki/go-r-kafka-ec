@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log"
 
-	// _ "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/service"
 	"github.com/mamalmaleki/go-r-kafka-ec/internal/web"
@@ -25,6 +25,37 @@ func main() {
 	go p.Run2()
 
 	// setup HTTP server
+	app := fiber.New()
+
+	app.Post("/post", func(c *fiber.Ctx) error {
+		payload := struct {
+			Title   string `json:"title"`
+			Content string `json:"content"`
+		}{}
+
+		if err := c.BodyParser(&payload); err != nil {
+			return err
+		}
+		_, err := api.NewMessage2(payload.Title, payload.Content)
+		if err != nil {
+			return c.Status(500).SendString(err.Error())
+		}
+		return c.Status(201).SendString("We have received your post and it will be published sooner or later.")
+	})
+
+	app.Get("/post/:slug", func(c *fiber.Ctx) error {
+		post, err := api.GetPost(c.Params("slug"))
+		if err != nil {
+			if errors.Is(err, redis.Nil) {
+				return c.Status(404).SendString("not found")
+			}
+			return c.Status(500).SendString(err.Error())
+		}
+		return c.JSON(post)
+	})
+
+	log.Fatal(app.Listen(":3000"))
+
 	e := echo.New()
 	e.POST("/post", func(c echo.Context) error {
 		title := c.Request().PostFormValue("title")
